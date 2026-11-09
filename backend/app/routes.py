@@ -31,6 +31,7 @@ class MetricsFacets(BaseModel):
     operation_types: list[OperationType]
     business_types: list[BusinessType]
     categories: list[Category]
+    categories_by_business: dict[BusinessType, list[Category]]
     min_date: date
     max_date: date
 
@@ -153,6 +154,13 @@ def build_metrics_facets(movements: list[FinancialMovement]) -> MetricsFacets:
         operation_types=sorted({item.operation_type for item in ordered}),
         business_types=sorted({item.business_type for item in ordered}),
         categories=sorted({item.category for item in ordered}),
+        categories_by_business={
+            business: sorted({
+                item.category for item in ordered
+                if item.business_type == business and item.operation_type == "income"
+            })
+            for business in ("B2B", "B2C")
+        },
         min_date=ordered[0].create_date,
         max_date=ordered[-1].create_date,
     )
@@ -223,8 +231,8 @@ def detect_outcome_alerts(
     alerts: list[MetricsAlert] = []
     historical_outcomes: list[float] = []
     for item in summary:
-        if historical_outcomes:
-            baseline = sum(historical_outcomes) / len(historical_outcomes)
+        if len(historical_outcomes) >= 3:
+            baseline = sum(historical_outcomes[-3:]) / 3
             if baseline > 0:
                 increase_ratio = (item.outcome - baseline) / baseline
                 if increase_ratio > threshold:
@@ -341,7 +349,7 @@ def get_metrics_comparison(
 
 @router.get("/api/metrics/alerts", response_model=list[MetricsAlert])
 def get_metrics_alerts(
-    threshold: float = Query(default=0.3, ge=0),
+    threshold: float = Query(default=0.3, ge=0.01, le=1.0),
     group_by: GroupBy = Query(default="month"),
     start_date: date | None = Query(default=None),
     end_date: date | None = Query(default=None),
