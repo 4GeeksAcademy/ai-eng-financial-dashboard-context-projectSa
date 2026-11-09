@@ -1,6 +1,6 @@
 # Contrato de datos para funcionalidades frontend
 
-Este directorio especifica tipos y comportamiento visible; no implementa componentes, transporte HTTP ni cambios de backend. El contrato se contrastó con el OpenAPI y las respuestas vivas de `http://localhost:8000/docs` (`/openapi.json`).
+Este directorio especifica tipos y comportamiento visible; no implementa componentes, transporte HTTP ni cambios de backend. El contrato se contrastó con el OpenAPI y las respuestas vivas de `http://localhost:8000/docs` (`/openapi.json`). `frontend/tsconfig.app.json` activa `strict: true` e incluye `specs/` para que estos tipos formen parte de la comprobación del proyecto.
 
 El frontend existente obtiene `GET /api/metrics` desde [App.tsx](../src/App.tsx) y tipa los movimientos mediante [financial-types.ts](../src/lib/financial-types.ts). Los nuevos contratos siguen ese uso de `fetch` y los nombres snake_case de la API, pero no especifican lógica de petición.
 
@@ -46,7 +46,7 @@ Los tipos son `AlertsParams` y `AlertsResponse` en `param-types.ts` y `api-types
 
 ### Desajuste de definición
 
-El requerimiento menciona una media móvil de los tres períodos previos. El OpenAPI solo devuelve `baseline_average`, y el comportamiento vivo calcula la media de todos los períodos anteriores disponibles dentro del rango agregado. No se debe presentar ese campo como “media móvil de 3 períodos”. La API crea una alerta únicamente cuando `increase_ratio > threshold`; se omite el primer período, sin histórico previo, y no se calcula alerta si la media base no es mayor que cero.
+El requerimiento exige la columna “Media móvil de los 3 períodos anteriores”. El OpenAPI solo devuelve `baseline_average`, y el comportamiento vivo calcula la media de todos los períodos anteriores disponibles dentro del rango agregado. Por eso la columna requerida debe indicar “No disponible con el contrato actual”; no se debe presentar `baseline_average` como si fuera la ventana de tres períodos. Este criterio queda bloqueado hasta que producto acepte la semántica API o el contrato exponga la media requerida. La API crea una alerta únicamente cuando `increase_ratio > threshold`; se omite el primer período, sin histórico previo, y no se calcula alerta si la media base no es mayor que cero.
 
 ### Casos límite
 
@@ -54,6 +54,7 @@ El requerimiento menciona una media móvil de los tres períodos previos. El Ope
 2. El incremento es exactamente igual al umbral: no mostrar una alerta, porque el criterio API es estrictamente mayor (`>`).
 3. El rango empieza en el primer período disponible y no hay observaciones previas dentro del rango: no hay baseline para ese período; no inventar una media ni una alerta.
 4. El input queda vacío o fuera de `0.01`–`1.0`: mostrar validación y no aplicar un valor fuera del rango de producto, aunque la API acepte `0` y valores mayores que `1`.
+5. Se necesita mostrar la media móvil de tres períodos: conservar esa columna y mostrar “No disponible con el contrato actual”; no reutilizar `baseline_average` con una etiqueta incorrecta.
 
 ## Funcionalidad 3: Comparativa de ingresos B2B vs B2C
 
@@ -62,7 +63,7 @@ El requerimiento menciona una media móvil de los tres períodos previos. El Ope
 | Endpoint | Uso | Parámetros de la funcionalidad | Respuesta |
 | --- | --- | --- | --- |
 | `GET /api/metrics/facets` | Mostrar rango global disponible. | Ninguno. | `FacetsResponse` |
-| `GET /api/metrics/categories/top` | Categorías con mayores ingresos para cada segmento. Llamar una vez por segmento. | `operation_type=income`, `limit=5`, `business_type=B2B` o `B2C`, más fechas opcionales. | `TopCategoriesResponse` (`CategoryEntry[]`) |
+| `GET /api/metrics/categories/top?operation_type=income&limit=5` | Categorías con mayores ingresos para cada segmento. Llamar una vez por segmento. | `business_type=B2B` o `B2C`, más fechas opcionales. | `TopCategoriesResponse` (`CategoryEntry[]`) |
 | `GET /api/metrics/summary` | Total de ingresos de cada segmento para el denominador y el gráfico. Llamar una vez por segmento. | `operation_type=income`, `business_type=B2B` o `B2C`, `group_by` opcional y las mismas fechas. | `MetricsSummaryResponse` (`MetricsSummaryEntry[]`) |
 
 El endpoint top acepta además los parámetros API `start_date`, `end_date`; `operation_type` (`income` o `outcome`, default `outcome`); `limit` entero de `1` a `20` (default `5`); y `business_type` (`B2B` o `B2C`). Para la vista, ambas tablas especifican `income` y `5` explícitamente. El contrato TypeScript es `TopCategoriesParams`.

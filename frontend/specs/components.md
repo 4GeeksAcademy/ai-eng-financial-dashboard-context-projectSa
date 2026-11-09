@@ -4,7 +4,7 @@ Este documento describe contratos de presentación. No prescribe componentes Rea
 
 ## Funcionalidad 1: Filtro de rango de fechas
 
-**Superficie:** filtro del dashboard principal, compuesto por fecha inicial opcional y fecha final opcional.
+**Componente:** `DashboardDateRangeFilter`, filtro del dashboard principal con fecha inicial y final opcionales.
 
 **Datos y contratos**
 
@@ -22,11 +22,12 @@ Este documento describe contratos de presentación. No prescribe componentes Rea
 - Si la fecha inicial es posterior a la fecha final, mostrar validación junto a los inputs y no aplicar ese rango. La API no documenta una validación de orden para este caso.
 - Mostrar el rango disponible obtenido de facets aun cuando el filtro esté vacío. Los valores son límites del conjunto completo; facets no recibe filtros de fecha.
 
-**Props conceptuales**
+**Props de `DashboardDateRangeFilter`**
 
 - `facets: FacetsResponse` para el rango disponible.
 - `value: DateRangeFilter` para la selección actual.
 - `onChange(value: DateRangeFilter): void` para comunicar cambios válidos.
+- `loading: boolean` y `error: string | null` para el estado de facets.
 
 **Estados condicionales**
 
@@ -37,7 +38,9 @@ Este documento describe contratos de presentación. No prescribe componentes Rea
 
 ## Funcionalidad 2: Tabla de alertas de anomalías
 
-**Endpoint:** `GET /api/metrics/alerts`.
+**Componente:** `AnomalyAlertsTable`.
+
+**Endpoint:** `GET /api/metrics/alerts?threshold=<ratio>`.
 
 **Parámetros:** `AlertsParams`. La pantalla envía `threshold` (por defecto `0.3`) y puede incluir `start_date` y `end_date`. `group_by` acepta `day`, `week` o `month` y su valor por defecto es `month`. `business_type`, si se usa, acepta `B2B` o `B2C`.
 
@@ -47,10 +50,10 @@ Este documento describe contratos de presentación. No prescribe componentes Rea
 | --- | --- | --- |
 | Período | `period` | Texto según agregación: `YYYY-MM-DD`, `YYYY-Www` o `YYYY-MM`. |
 | Outcome registrado | `outcome_total` | Importe monetario del período. |
-| Media histórica previa | `baseline_average` | Importe monetario. El contrato API promedia todos los períodos anteriores disponibles en el rango, no solo los tres inmediatamente anteriores. No titular esta columna como promedio móvil de 3 períodos. |
+| Media móvil de los 3 períodos anteriores | No disponible en la respuesta actual. | Es una columna requerida por producto, pero `baseline_average` promedia todos los períodos anteriores del rango y no representa esta ventana. No sustituir un valor por el otro ni marcar la funcionalidad como conforme hasta resolver el contrato. |
 | Incremento porcentual | `increase_ratio` | Multiplicar la razón decimal por 100 para mostrar porcentaje; `0.3` se presenta como `30%`. |
 
-El wording de producto “media móvil de 3 períodos anteriores” no coincide con `baseline_average` en la respuesta viva: la implementación documentada por la API usa el promedio acumulado de períodos previos. La tabla debe expresar ese significado real hasta que el backend exponga una media móvil de tres períodos.
+El wording de producto requiere literalmente “media móvil de los 3 períodos anteriores”; la respuesta viva solo incluye `baseline_average`, calculado sobre todos los períodos anteriores disponibles del rango. `AlertsResponse` no permite presentar honestamente la media móvil solicitada. La columna debe conservar el encabezado requerido y mostrar “No disponible con el contrato actual” hasta que producto acepte la semántica API o se publique un contrato que proporcione la ventana de tres períodos. No etiquetar `baseline_average` como media móvil.
 
 **Configuración del umbral**
 
@@ -59,7 +62,7 @@ El wording de producto “media móvil de 3 períodos anteriores” no coincide 
 - La alerta se incluye solo cuando el incremento supera el umbral (`increase_ratio > threshold`); la comparación no es inclusiva.
 - La base solo se calcula cuando existe al menos un período anterior y su promedio es mayor que cero. No se genera alerta para un primer período sin histórico.
 
-**Props conceptuales**
+**Props de `AnomalyAlertsTable`**
 
 - `entries: AlertsResponse` y `params: AlertsParams`.
 - `loading: boolean` y `error: string | null` para estados de consulta.
@@ -74,12 +77,12 @@ El wording de producto “media móvil de 3 períodos anteriores” no coincide 
 
 ## Funcionalidad 3: Comparativa de ingresos B2B vs B2C
 
-**Superficie:** nueva página con dos tablas paralelas (B2B y B2C) y un único gráfico que compara el ingreso total de ambos segmentos.
+**Componentes:** `B2BvsB2CIncomeComparisonPage`, `IncomeCategoryTable` (dos instancias, B2B y B2C) e `IncomeTotalsComparisonChart` (un único gráfico).
 
 **Endpoints y contratos**
 
 - `GET /api/metrics/facets` → `FacetsResponse`, para mostrar el rango disponible.
-- `GET /api/metrics/categories/top` → `TopCategoriesResponse`, con `operation_type=income`, `limit=5` y `business_type=B2B` para la tabla B2B; repetir con `business_type=B2C` para la tabla B2C. Añadir a ambas peticiones el mismo `DateRangeFilter` activo, si existe.
+- `GET /api/metrics/categories/top?operation_type=income&limit=5` → `TopCategoriesResponse`, con `business_type=B2B` para la tabla B2B; repetir con `business_type=B2C` para la tabla B2C. Añadir a ambas peticiones el mismo `DateRangeFilter` activo, si existe.
 - `GET /api/metrics/summary` → `MetricsSummaryResponse`, con `operation_type=income`, `business_type=B2B` o `B2C`, y el mismo `DateRangeFilter`. Se requiere una consulta por segmento para obtener el denominador de los porcentajes y el total para el gráfico.
 - `TopCategoryItem` solo contiene `category`, `operation_type` y `total_amount`; no devuelve porcentaje ni total de grupo. `MetricsSummaryItem` contiene `period`, `income`, `outcome` y `net`.
 
@@ -90,11 +93,21 @@ El wording de producto “media móvil de 3 períodos anteriores” no coincide 
 - El único gráfico compara los dos totales (`totalIncomeForSegment`) calculados desde summary; no sumar solo las categorías mostradas, porque top-5 podría no incluir todas las categorías.
 - Las tablas y el gráfico deben usar el mismo filtro de fechas en las consultas de categorías y summary. El rango de facets es disponibilidad global, no el rango activo.
 
-**Props conceptuales**
+**Props de `B2BvsB2CIncomeComparisonPage`**
 
 - `facets: FacetsResponse` y `dateRange: DateRangeFilter`.
 - `b2bCategories: TopCategoriesResponse` y `b2cCategories: TopCategoriesResponse`.
 - `b2bSummary: MetricsSummaryResponse` y `b2cSummary: MetricsSummaryResponse`.
+
+**Props de `IncomeCategoryTable`**
+
+- `businessType: BusinessType`, `entries: TopCategoriesResponse` y `totalIncome: number`.
+- `loading: boolean` y `error: string | null` para el estado de esa sección.
+
+**Props de `IncomeTotalsComparisonChart`**
+
+- `b2bIncome: number` y `b2cIncome: number`, calculados desde summary.
+- `loading: boolean` y `error: string | null` para el estado del gráfico.
 
 **Estados condicionales**
 

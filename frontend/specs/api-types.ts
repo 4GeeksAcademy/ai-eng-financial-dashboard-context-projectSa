@@ -26,6 +26,7 @@ export interface FacetsResponse {
   business_types: BusinessType[];
   /** Available transaction categories from the `Category` union. */
   categories: Category[];
+  categories_by_business: Record<BusinessType, Category[]>;
   /** Earliest available transaction date, formatted as `YYYY-MM-DD`. */
   min_date: string;
   /** Latest available transaction date, formatted as `YYYY-MM-DD`. */
@@ -42,8 +43,8 @@ export interface AlertEntry {
   /** Sum of recorded outcome amounts in this period, in currency units. */
   outcome_total: number;
   /**
-   * Mean outcome amount for all earlier returned periods in the selected
-   * range, in currency units; this is not limited to the preceding 3 periods.
+  * Mean outcome amount for the preceding 3 periods in the selected range,
+  * in currency units. Alerts require at least 3 earlier periods.
    */
   baseline_average: number;
   /**

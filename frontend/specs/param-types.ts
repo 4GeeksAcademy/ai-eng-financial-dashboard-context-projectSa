@@ -1,5 +1,6 @@
 import type {
   BusinessType,
+  Category,
   GroupBy,
   OperationType,
 } from "./api-types";
@@ -21,9 +22,8 @@ export interface DateRangeFilter {
 /** Query parameters accepted by `GET /api/metrics/alerts`. */
 export interface AlertsParams extends DateRangeFilter {
   /**
-   * Alert cutoff as a decimal ratio. The UI constrains input to `0.01`–`1.0`
-   * with default `0.3`; the API itself accepts any number greater than or equal
-   * to `0` and has no upper bound.
+  * Alert cutoff as a decimal ratio from `0.01` through `1.0`, inclusive.
+  * Both the UI and API enforce these bounds. Default: `0.3`.
    */
   threshold?: number;
   /**
@@ -53,6 +53,8 @@ export interface MetricsSummaryParams extends DateRangeFilter {
    * Period aggregation; one of `day`, `week`, or `month`. API default: `month`.
    */
   group_by?: GroupBy;
+  /** Optional category filter from the API `Category` enum. */
+  category?: Category;
   /** Optional operation filter; the comparison feature sends `income`. */
   operation_type?: OperationType;
   /** Segment whose totals are requested; one of `B2B` or `B2C`. */
